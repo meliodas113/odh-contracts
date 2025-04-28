@@ -20,6 +20,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
     struct Market {
         string question;
         string imageURI;
+        string category;
         uint256 endTime;
         MarketOutcome outcome;
         string optionA;
@@ -40,6 +41,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
         uint256 indexed marketId,
         string question,
         string imageURI,
+        string category,
         string optionA,
         string optionB,
         uint256 endTime
@@ -82,6 +84,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
      * @notice Creates a new prediction market.
      * @param _question The question for the market.
      * @param _imageURI The URI for the market's image.
+     * @param _category The category of the market.
      * @param _optionA The first option for the market.
      * @param _optionB The second option for the market.
      * @param _duration The duration for which the market is active.
@@ -90,6 +93,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
     function createMarket(
         string memory _question,
         string memory _imageURI,
+        string memory _category,
         string memory _optionA,
         string memory _optionB,
         uint256 _duration
@@ -106,6 +110,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
 
         market.question = _question;
         market.imageURI = _imageURI;
+        market.category = _category;
         market.optionA = _optionA;
         market.optionB = _optionB;
         market.endTime = block.timestamp + _duration;
@@ -115,6 +120,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
             marketId,
             _question,
             _imageURI,
+            _category,
             _optionA,
             _optionB,
             market.endTime
@@ -216,6 +222,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
      * @param _marketId The ID of the market to retrieve information for.
      * @return question The market's question.
      * @return imageURI The URI for the market's image.
+     * @return category The category of the market.
      * @return optionA The first option for the market.
      * @return optionB The second option for the market.
      * @return endTime The end time of the market.
@@ -232,6 +239,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
         returns (
             string memory question,
             string memory imageURI,
+            string memory category,
             string memory optionA,
             string memory optionB,
             uint256 endTime,
@@ -245,6 +253,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
         return (
             market.question,
             market.imageURI,
+            market.category,
             market.optionA,
             market.optionB,
             market.endTime,
