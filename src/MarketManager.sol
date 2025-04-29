@@ -4,19 +4,13 @@ pragma solidity ^0.8.13;
 import {Ownable} from "@thirdweb-dev/contracts/extension/Ownable.sol";
 import {ReentrancyGuard} from "@thirdweb-dev/contracts/external-deps/openzeppelin/security/ReentrancyGuard.sol";
 
-/**
- * @title MarketManager
- * @dev Prediction market contract where users can bet on outcomes using native tokens and claim winnings based on the result.
- */
 contract MarketManager is Ownable, ReentrancyGuard {
-    /// @notice Market prediction outcome enum
     enum MarketOutcome {
         UNRESOLVED,
         OPTION_A,
         OPTION_B
     }
 
-    /// @dev Represents a prediction market.
     struct Market {
         string question;
         string imageURI;
@@ -282,6 +276,40 @@ contract MarketManager is Ownable, ReentrancyGuard {
         );
     }
 
+    struct MarketView {
+        string question;
+        string imageURI;
+        string category;
+        uint256 endTime;
+        MarketOutcome outcome;
+        string optionA;
+        string optionB;
+        uint256 totalOptionAShares;
+        uint256 totalOptionBShares;
+        bool resolved;
+    }
+
+    function getAllMarkets() public view returns (MarketView[] memory) {
+        MarketView[] memory marketViews = new MarketView[](marketCount);
+        for (uint256 i = 0; i < marketCount; i++) {
+            Market storage market = markets[i];
+            marketViews[i] = MarketView(
+                market.question,
+                market.imageURI,
+                market.category,
+                market.endTime,
+                market.outcome,
+                market.optionA,
+                market.optionB,
+                market.totalOptionAShares,
+                market.totalOptionBShares,
+                market.resolved
+            );
+        }
+        return marketViews;
+    }
+
+
     /**
      * @notice Allows multiple users to claim their winnings in a batch for a given market.
      * @param _marketId The ID of the market for which winnings are claimed.
@@ -341,4 +369,14 @@ contract MarketManager is Ownable, ReentrancyGuard {
             emit Claimed(_marketId, user, winnings);
         }
     }
+    /**
+    * @notice Removes a market from the contract.
+    * @dev Can only be called by the owner.
+    * @param marketId The ID of the market to remove.
+    */
+function removeMarket(uint256 marketId) external onlyOwner {
+        require(marketId < marketCount, "Invalid market ID");
+        delete markets[marketId];
+    }
 }
+
