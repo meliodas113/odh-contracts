@@ -11,6 +11,10 @@ contract MarketManager is Ownable, ReentrancyGuard {
         OPTION_B
     }
     mapping(address => bool) public isAdmin;
+    uint256 public fees;
+
+    address public feeRecipient=0x06Cf18ec8DaDA3E6b86c38DE2c5536811Cd9594C;
+    
     struct Market {
         string question;
         string imageURI;
@@ -52,6 +56,10 @@ contract MarketManager is Ownable, ReentrancyGuard {
     /// @notice Emitted when a market is resolved with an outcome.
     event MarketResolved(uint256 indexed marketId, MarketOutcome outcome);
 
+    /// @notice Emitted when fees are updated
+    event FeesUpdated(uint256 oldFees, uint256 newFees);
+    
+
     /// @notice Emitted when winnings are claimed by a user.
     event Claimed(
         uint256 indexed marketId,
@@ -65,6 +73,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
     constructor() {
         _setupOwner(msg.sender); 
         isAdmin[msg.sender]=true;
+        fees = 100; 
     }
 
     modifier onlyAdmin() {
@@ -83,6 +92,15 @@ contract MarketManager is Ownable, ReentrancyGuard {
     isAdmin[_admin] = false;
     }
 
+    /**
+     * @notice Updates the fee percentage (in basis points)
+     * @param _newFees The new fee percentage in basis points (1/100 of a percent) - 100 = 1%
+     */
+    function updateFees(uint256 _newFees) external onlyAdmin {
+        uint256 oldFees = fees;
+        fees = _newFees;
+        emit FeesUpdated(oldFees, _newFees);
+    }
 
     /**
      * @dev Required override for Thirdweb's Ownable extension.
@@ -154,7 +172,8 @@ contract MarketManager is Ownable, ReentrancyGuard {
         require(!market.resolved, "Market already resolved");
         require(msg.value > 0, "Amount must be positive");
 
-        uint256 amount = msg.value;
+        uint256 feeAmount = (msg.value * fees) / 10000;
+        uint256 amount = msg.value - feeAmount; 
 
         if (_isOptionA) {
             market.optionASharesBalance[msg.sender] += amount;
@@ -162,6 +181,11 @@ contract MarketManager is Ownable, ReentrancyGuard {
         } else {
             market.optionBSharesBalance[msg.sender] += amount;
             market.totalOptionBShares += amount;
+        }
+
+         if (feeAmount > 0 && feeRecipient != address(0)) {
+            (bool success, ) = feeRecipient.call{value: feeAmount}("");
+            require(success, "Fee transfer failed");
         }
 
         emit SharesPurchased(_marketId, msg.sender, _isOptionA, amount);
