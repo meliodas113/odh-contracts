@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import {Ownable} from "@thirdweb-dev/contracts/extension/Ownable.sol";
 import {ReentrancyGuard} from "@thirdweb-dev/contracts/external-deps/openzeppelin/security/ReentrancyGuard.sol";
@@ -10,7 +10,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
         OPTION_A,
         OPTION_B
     }
-
+    mapping(address => bool) public isAdmin;
     struct Market {
         string question;
         string imageURI;
@@ -63,8 +63,26 @@ contract MarketManager is Ownable, ReentrancyGuard {
      * @dev Initializes the contract owner.
      */
     constructor() {
-        _setupOwner(msg.sender); // Set the contract deployer as the owner
+        _setupOwner(msg.sender); 
+        isAdmin[msg.sender]=true;
     }
+
+    modifier onlyAdmin() {
+    require(isAdmin[msg.sender], "Not an admin");
+    _;
+    }
+
+    function addAdmin(address _admin) external onlyOwner {
+    require(_admin != address(0), "Invalid address");
+    isAdmin[_admin] = true;
+    }
+
+    /// @notice Removes an admin (only callable by contract owner)
+    function removeAdmin(address _admin) external onlyOwner {
+    require(_admin != address(0), "Invalid address");
+    isAdmin[_admin] = false;
+    }
+
 
     /**
      * @dev Required override for Thirdweb's Ownable extension.
@@ -92,7 +110,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
         string memory _optionB,
         uint256 _duration
     ) external returns (uint256) {
-        require(msg.sender == owner(), "Only owner can create markets");
+        require(isAdmin[msg.sender], "Only admin can create markets");
         require(_duration > 0, "Duration must be positive");
         require(
             bytes(_optionA).length > 0 && bytes(_optionB).length > 0,
@@ -155,15 +173,13 @@ contract MarketManager is Ownable, ReentrancyGuard {
      * @param _outcome The outcome to set for the market.
      */
     function resolveMarket(uint256 _marketId, MarketOutcome _outcome) external {
-        require(msg.sender == owner(), "Only owner can resolve markets");
+        require(isAdmin[msg.sender], "Only admin can resolve markets");
         Market storage market = markets[_marketId];
         require(block.timestamp >= market.endTime, "Market hasn't ended yet");
         require(!market.resolved, "Market already resolved");
         require(_outcome != MarketOutcome.UNRESOLVED, "Invalid outcome");
-
         market.outcome = _outcome;
         market.resolved = true;
-
         emit MarketResolved(_marketId, _outcome);
     }
 
@@ -197,12 +213,10 @@ contract MarketManager is Ownable, ReentrancyGuard {
         require(userShares > 0, "No winnings to claim");
         require(winningShares > 0, "No winning shares");
 
-        // Calculate the reward ratio
-        uint256 rewardRatio = (losingShares * 1e18) / winningShares; // Using 1e18 for precision
+        uint256 rewardRatio = (losingShares * 1e18) / winningShares; 
 
-        // Calculate winnings: original stake + proportional share of losing funds
         uint256 winnings = userShares + (userShares * rewardRatio) / 1e18;
-
+        
         market.hasClaimed[msg.sender] = true;
 
         (bool success, ) = msg.sender.call{value: winnings}("");
@@ -374,9 +388,24 @@ contract MarketManager is Ownable, ReentrancyGuard {
     * @dev Can only be called by the owner.
     * @param marketId The ID of the market to remove.
     */
-function removeMarket(uint256 marketId) external onlyOwner {
+    function removeMarket(uint256 marketId) external onlyOwner {
         require(marketId < marketCount, "Invalid market ID");
-        delete markets[marketId];
+        markets[marketId].question="none";
+        markets[marketId].resolved=true;
     }
+
+    /**
+    * @notice Removes a market from the contract.
+    * @param user The address of the user to check eligibility.
+    * @param marketId The marketId for which we need to check whether rewards have been claimed.
+    */
+
+    function checkHasClaimed(address user, uint256 marketId) public view returns (bool){
+        Market storage currentMarket=markets[marketId];
+        bool hasClaimed=currentMarket.hasClaimed[user];
+        return hasClaimed;
+    }
+
+
 }
 
