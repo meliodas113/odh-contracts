@@ -73,7 +73,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
     constructor() {
         _setupOwner(msg.sender); 
         isAdmin[msg.sender]=true;
-        fees = 100; 
+        fees = 0; 
     }
 
     modifier onlyAdmin() {
@@ -182,7 +182,7 @@ contract MarketManager is Ownable, ReentrancyGuard {
             market.optionBSharesBalance[msg.sender] += amount;
             market.totalOptionBShares += amount;
         }
-
+        
          if (feeAmount > 0 && feeRecipient != address(0)) {
             (bool success, ) = feeRecipient.call{value: feeAmount}("");
             require(success, "Fee transfer failed");
@@ -240,9 +240,9 @@ contract MarketManager is Ownable, ReentrancyGuard {
         uint256 rewardRatio = (losingShares * 1e18) / winningShares; 
 
         uint256 winnings = userShares + (userShares * rewardRatio) / 1e18;
+       
         
         market.hasClaimed[msg.sender] = true;
-
         (bool success, ) = msg.sender.call{value: winnings}("");
         require(success, "Native token transfer failed");
 
@@ -348,65 +348,6 @@ contract MarketManager is Ownable, ReentrancyGuard {
     }
 
 
-    /**
-     * @notice Allows multiple users to claim their winnings in a batch for a given market.
-     * @param _marketId The ID of the market for which winnings are claimed.
-     * @param _users Array of user addresses who wish to claim their winnings.
-     */
-    function batchClaimWinnings(
-        uint256 _marketId,
-        address[] calldata _users
-    ) external nonReentrant {
-        Market storage market = markets[_marketId];
-        require(market.resolved, "Market not resolved yet");
-
-        for (uint256 i = 0; i < _users.length; i++) {
-            address user = _users[i];
-
-            // Skip if the user already claimed
-            if (market.hasClaimed[user]) {
-                continue;
-            }
-
-            uint256 userShares;
-            uint256 winningShares;
-            uint256 losingShares;
-
-            // Determine user shares and winning/losing shares based on the outcome
-            if (market.outcome == MarketOutcome.OPTION_A) {
-                userShares = market.optionASharesBalance[user];
-                winningShares = market.totalOptionAShares;
-                losingShares = market.totalOptionBShares;
-                market.optionASharesBalance[user] = 0;
-            } else if (market.outcome == MarketOutcome.OPTION_B) {
-                userShares = market.optionBSharesBalance[user];
-                winningShares = market.totalOptionBShares;
-                losingShares = market.totalOptionAShares;
-                market.optionBSharesBalance[user] = 0;
-            } else {
-                revert("Market outcome is not valid");
-            }
-
-            // Skip if the user has no shares or there are no winning shares
-            if (userShares == 0 || winningShares == 0) {
-                continue;
-            }
-
-            // Calculate the reward ratio and user's winnings
-            uint256 rewardRatio = (losingShares * 1e18) / winningShares;
-            uint256 winnings = userShares + (userShares * rewardRatio) / 1e18;
-
-            // Mark the user as having claimed winnings
-            market.hasClaimed[user] = true;
-
-            // Transfer winnings to the user
-            (bool success, ) = user.call{value: winnings}("");
-            require(success, "Native token transfer failed");
-
-            // Emit an event for each user who claimed winnings
-            emit Claimed(_marketId, user, winnings);
-        }
-    }
     /**
     * @notice Removes a market from the contract.
     * @dev Can only be called by the owner.
